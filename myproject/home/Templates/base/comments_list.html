@@ -1,0 +1,122 @@
+{% for c in comments %}
+<div class="comment-group bg-white rounded-lg border border-gray-200 mb-4 p-4 shadow-sm" id="comment-group-{{ c.id }}">
+    <!-- Comment cha -->
+    <div class="comment-item" id="comment-{{ c.id }}">
+        <!-- Header -->
+        <div class="comment-header flex items-center gap-3 mb-2">
+            <div class="user-avatar w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+                {% if c.user.avatar %}
+                    <img src="{{ c.user.avatar.url }}" class="w-10 h-10 rounded-full object-cover" />
+                {% else %}
+                    <span class="font-bold">{{ c.user.full_name|first|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="flex-1">
+                <div class="comment-author font-semibold text-gray-800">{{ c.user.full_name }}</div>
+                <div class="comment-time text-xs text-gray-500">{{ c.created_at|timesince }} trước</div>
+            </div>
+            {% if current_user == c.user or current_user == c.post.user %}
+                <button class="delete-comment-btn text-red-500 hover:text-red-700 font-bold text-xl" onclick="deleteComment({{c.id}}, {{c.post.id}})">×</button>
+            {% endif %}
+        </div>
+
+        <!-- Nội dung -->
+        <div class="comment-content mb-3 text-gray-700 ml-13">
+            {{ c.content }}
+        </div>
+
+        <!-- Ảnh (1 ảnh duy nhất) -->
+        {% if c.image %}
+        <div class="comment-images mb-3 ml-13">
+            <div class="comment-image w-32 h-32 overflow-hidden rounded-lg cursor-pointer border border-gray-200">
+                <img src="{{ c.image.url }}" alt="Ảnh bình luận" class="w-full h-full object-cover hover:scale-110 transition-transform" />
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Hành động -->
+        <div class="comment-actions flex gap-6 text-sm text-gray-600 ml-13 mb-2">
+            <button class="like-comment-btn action-btn hover:text-blue-500 flex items-center gap-1 transition-colors"
+                    onclick="likeComment({{c.id}}, this)"
+                    data-liked="false">
+                <span class="text-base">👍</span>
+                <span>Thích (<span class="like-count">{{c.likeCount}}</span>)</span>
+            </button>
+            <button class="reply-comment-btn action-btn hover:text-green-500 flex items-center gap-1 transition-colors"
+                    onclick="toggleReplyForm({{c.id}})">
+                <span class="text-base">💬</span>
+                <span>Trả lời</span>
+            </button>
+        </div>
+
+        <!-- Form trả lời (ẩn mặc định) -->
+        <div id="reply-form-{{c.id}}" class="reply-form mt-3 ml-13 bg-gray-50 p-3 rounded-lg border border-gray-200" style="display:none;">
+            <div class="flex gap-2">
+                <input type="text"
+                       id="reply-input-{{c.id}}"
+                       class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                       placeholder="Viết câu trả lời...">
+                <button onclick="submitReply({{c.id}}, {{c.post.id}})"
+                        class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors font-medium">
+                    Gửi
+                </button>
+                <button onclick="toggleReplyForm({{c.id}})"
+                        class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-400 transition-colors">
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danh sách replies - tab vào so với comment gốc -->
+    {% if c.replies.all %}
+    <div class="replies-section mt-3 ml-13" id="replies-section-{{c.id}}">
+        <div id="replies-{{c.id}}" class="replies-container space-y-3">
+            {% for reply in c.replies.all %}
+                <div class="reply-item bg-white rounded-lg border border-gray-200 p-4 shadow-sm ml-13" id="comment-{{ reply.id }}">
+                    <!-- Header -->
+                    <div class="comment-header flex items-center gap-3 mb-2">
+                        <div class="user-avatar w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+                            {% if reply.user.avatar %}
+                                <img src="{{ reply.user.avatar.url }}" class="w-10 h-10 rounded-full object-cover" />
+                            {% else %}
+                                <span class="font-bold">{{ reply.user.full_name|first|upper }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1">
+                            <div class="comment-author font-semibold text-gray-800">{{ reply.user.full_name }}</div>
+                            <div class="comment-time text-xs text-gray-500">{{ reply.created_at|timesince }} trước</div>
+                        </div>
+                        {% if current_user == reply.user or current_user == c.post.user %}
+                            <button class="delete-comment-btn text-red-500 hover:text-red-700 font-bold text-xl" onclick="deleteComment({{reply.id}}, {{c.post.id}})">×</button>
+                        {% endif %}
+                    </div>
+
+                    <!-- Nội dung -->
+                    <div class="comment-content mb-3 text-gray-700 ml-13">
+                        {{ reply.content }}
+                    </div>
+
+                    <!-- Ảnh -->
+                    {% if reply.image %}
+                    <div class="comment-images mb-3 ml-13">
+                        <div class="comment-image w-32 h-32 overflow-hidden rounded-lg cursor-pointer border border-gray-200">
+                            <img src="{{ reply.image.url }}" alt="Ảnh bình luận" class="w-full h-full object-cover hover:scale-110 transition-transform" />
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- Container rỗng để JavaScript thêm replies vào -->
+    <div class="replies-section mt-3 ml-13" id="replies-section-{{c.id}}" style="display:none;">
+        <div id="replies-{{c.id}}" class="replies-container space-y-3">
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% empty %}
+<p class="no-comment text-gray-500 p-3 text-center" style="padding:20px;">Chưa có bình luận nào.</p>
+{% endfor %}

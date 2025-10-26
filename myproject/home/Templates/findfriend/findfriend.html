@@ -1,0 +1,90 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'findfriend/style.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="header">
+    <h1>Kết quả tìm kiếm cho: "{{ keyword }}"</h1>
+  </div>
+
+  {% if keyword %}
+    {% if results %}
+      <div class="friends-list">
+        {% for user, mutual, friendship_status, friendship_sender_id in results %}
+        <div class="friend-item">
+          <div class="friend-left">
+            {% if user.avatar %}
+              <a href="{% url 'personal_with_id' user.id %}" style="text-decoration:none;color:white">
+              <img src="{{ user.avatar.url }}" alt="{{ user.full_name }}" class="avatar">
+              </a>
+            {% else %}
+              <a href="{% url 'personal_with_id' user.id %}" style="text-decoration:none;color:white">
+              <div class="avatar">{{ user.full_name|slice:":1" }}</div>
+              </a>
+            {% endif %}
+            <div class="friend-info">
+              <a href="{% url 'personal_with_id' user.id %}" style="text-decoration:none;color:white">
+              <h3>{{ user.full_name }}</h3>
+              </a>
+              <p>{{ mutual }} bạn chung</p>
+            </div>
+          </div>
+      
+          <div class="friend-actions">
+            {% if friendship_status == None %}
+            <form method="post" action="{% url 'add_friend' user.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="add-friend-btn">Thêm bạn bè</button>
+            </form>
+      
+            {% elif friendship_status == "pending" %}
+              {% if friendship_sender_id == current_user.id %}
+              <form method="post" action="{% url 'cancel_request' user.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="btn btn-warning">❌ Hủy lời mời</button>
+              </form>
+              {% else %}
+              <form method="post" action="{% url 'accept_request' user.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="btn btn-success">✅ Đồng ý</button>
+              </form>
+              <form method="post" action="{% url 'cancel_request' user.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="btn btn-danger">❌ Từ chối</button>
+              </form>
+              {% endif %}
+      
+            {% elif friendship_status == "accepted" %}
+              <form method="post" action="{% url 'delete_friend' user.id %}">
+                {% csrf_token %}
+                <button class="btn btn-danger">❌ Hủy kết bạn</button>
+              </form>
+            {% endif %}
+      
+            <!-- luôn có nút nhắn tin -->
+            <button class="add-friend-btn" onclick="sendMessage('{{ user.id }}')">💬 Nhắn tin</button>
+          </div>
+        </div>
+      {% endfor %}
+      
+      </div>
+    {% else %}
+      <div class="no-results">Không tìm thấy kết quả nào cho "{{ keyword }}"</div>
+    {% endif %}
+  {% else %}
+    <div class="no-results">Vui lòng nhập từ khóa để tìm kiếm bạn bè.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'findfriend/script.js' %}" defer></script>
+{% endblock %}

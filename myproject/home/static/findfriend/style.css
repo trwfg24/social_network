@@ -1,0 +1,152 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+  }
+  
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .header {
+    margin-top:40px;
+    padding: 20px;
+    border-bottom: 1px solid #e4e6ea;
+  }
+  
+  .header h1 {
+    font-size: 20px;
+    color: #1c1e21;
+    margin: 0;
+  }
+  
+  .friends-list {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  
+  .friend-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f2f5;
+    justify-content: space-between;
+  }
+  
+  .friend-item:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .friend-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+  
+  .avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    /* background-color: #1877f2; */
+    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    margin-right: 15px;
+  }
+  
+  .friend-info h3 {
+    font-size: 16px;
+    color: #1c1e21;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  
+  .friend-info p {
+    font-size: 13px;
+    color: #65676b;
+    margin: 0;
+  }
+  
+  .add-friend-btn {
+    background-color: #1877f2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .add-friend-btn:hover {
+    background-color: #166fe5;
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 40px 20px;
+    color: #65676b;
+  }
+  
+  .friend-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  /* Nút mặc định */
+  .friend-actions button {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+  }
+  
+  /* Thêm bạn */
+  .friend-actions .add-friend-btn {
+    background: #1877f2;  /* xanh giống facebook */
+    color: #fff;
+  }
+  
+  .friend-actions .add-friend-btn:hover {
+    background: #145dc0;
+  }
+  
+  /* Hủy lời mời */
+  .friend-actions .btn-warning {
+    background: #e3d7a8;
+    color: #333;
+  }
+  
+  .friend-actions .btn-warning:hover {
+    background: #e55252;
+  }
+  
+  /* Đồng ý */
+  .friend-actions .btn-success {
+    background: #4caf50;
+    color: #fff;
+  }
+  
+  .friend-actions .btn-success:hover {
+    background: #3d8b40;
+  }
+  
+  /* Từ chối / Hủy kết bạn */
+  .friend-actions .btn-danger {
+    background: #f44336;
+    color: #fff;
+  }
+  
+  .friend-actions .btn-danger:hover {
+    background: #d32f2f;
+  }

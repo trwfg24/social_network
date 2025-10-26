@@ -1,0 +1,945 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'personal/style.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container">
+
+    <!-- Profile Box -->
+    <div class="profile-box fade-in-up" style="animation-delay: 0.1s">
+        <div class="profile-header">
+            <div class="avatar">
+                {% if profile_user.avatar %}
+                    <img src="{{ profile_user.avatar.url }}" alt="{{ profile_user.full_name }}">
+                {% else %}
+                    {{ profile_user.full_name|slice:":1" }}
+                {% endif %}
+            </div>
+
+            <div class="profile-info">
+                <h1>{{ profile_user.full_name }}</h1>
+                <div class="bio">
+                    {{ profile_user.bio }}
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-number">{{ profile_user.get_friends_count }}</span>
+                <span class="stat-label">Bạn bè</span>
+            </div>
+        </div>
+
+        <div class="buttons">
+            {% if current_user == profile_user %}
+                <button class="btn btn-primary" onclick="openEditProfileModal()">
+                    ✏️ Chỉnh sửa
+                </button>
+            {% else %}
+
+            {% if friendship_status == None %}
+            <!-- Chưa gửi lời mời -->
+            <form method="post" action="{% url 'add_friend' profile_user.id %}">
+                {% csrf_token %}
+                <button class="btn btn-secondary">Thêm bạn bè</button>
+            </form>
+
+
+            {% elif friendship_status == 'pending' %}
+                {% if friendship_sender_id == current_user.id %}
+                <!-- Người này là người gửi -->
+                <form method="post" action="{% url 'cancel_request' profile_user.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-warning">❌ Hủy lời mời</button>
+                </form>
+                {% else %}
+                <!-- Người này là người nhận -->
+                <form method="post" action="{% url 'accept_request' profile_user.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-success" style="background:#57ff57">✅ Đồng ý</button>
+                </form>
+                <form method="post" action="{% url 'cancel_request' profile_user.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-danger" style="background:#ff9095">❌ Từ chối</button>
+                </form>
+            {% endif %}
+
+            {% elif friendship_status == 'accepted' %}
+            <!-- Đã là bạn bè -->
+            <form method="post" action="{% url 'delete_friend' profile_user.id %}">
+                {% csrf_token %}
+                <button class="btn btn-danger" style="background:#ff9095">❌ Hủy kết bạn</button>
+            </form>
+            {% endif %}
+
+            <button class="btn btn-secondary" onclick="sendFriendRequest()">
+                💬 Nhắn tin
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+
+
+    <!-- Content Section -->
+    <div class="content-section fade-in-up" style="animation-delay: 0.2s">
+        <!-- Post Composer -->
+        {% if current_user == profile_user %}
+        <div class="post-composer">
+            <form id="postForm" method="post" enctype="multipart/form-data" action="{% url 'create_post' %}">
+                {% csrf_token %}
+                <div class="composer-header">
+                    <div class="user-avatar">
+                        {% if current_user.avatar %}
+                            <img src="{{ current_user.avatar.url }}" alt="{{ current_user.full_name }}">
+                        {% else %}
+                            {{ current_user.full_name|slice:":1" }}
+                        {% endif %}
+                    </div>
+                    <span style="color: #666; font-size: 1.1rem;">Bạn đang nghĩ gì?</span>
+                </div>
+                <textarea placeholder="Chia sẻ suy nghĩ của bạn..." id="postContent" name="content"></textarea>
+                <div class="post-actions">
+                    <div class="post-icons">
+                        <label for="image-upload" class="custom-file-upload">
+                            📷 Chọn ảnh
+                        </label>
+                        <input id="image-upload" type="file" name="media" accept="image/*">
+                    </div>
+                    <button class="btn btn-primary">Đăng bài</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+        const highlightPostId = "{{ highlight_post_id|default:'' }}";
+        const highlightCommentId = "{{ highlight_comment_id|default:'' }}";
+
+        if (highlightPostId && highlightPostId !== "None") {
+            const postEl = document.getElementById("post-" + highlightPostId);
+            if (postEl) {
+                postEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                postEl.classList.add("highlight");
+
+                // Nếu có comment id thực sự → mới mở modal
+                if (highlightCommentId && highlightCommentId !== "None") {
+                    setTimeout(() => {
+                        openModal(highlightPostId);
+
+                        // Chờ modal load xong comments
+                        setTimeout(() => {
+                            const commentEl = document.getElementById("comment-" + highlightCommentId);
+                            if (commentEl) {
+                                commentEl.classList.add("highlight-comment");
+                                commentEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }
+                        }, 800);
+                    }, 500);
+                }
+            }
+        }
+    });
+    </script>
+
+
+
+            <style>
+                .highlight-comment {
+                    background: #fff3cd;
+                    border-left: 3px solid #ffc107;
+                    padding-left: 8px;
+                    animation: blink 1s ease-in-out 3;
+                }
+
+                @keyframes blink {
+                    50% { opacity: 0.5; }
+                }
+            </style>
+
+        <!-- Posts Container -->
+        <div class="posts-container" id="posts-container">
+            {% for post in posts %}
+            <div class="post {% if post.id|stringformat:'s' == highlight_post_id %}highlight{% endif %}" id="post-{{ post.id }}"">
+                <div class="post-header" style="position:relative">
+
+                    <button class="delete-post-btn" onclick="deletePost({{ post.id }})"
+                    style="position: absolute; top: 5px; right: 5px; background: transparent; border: none; cursor: pointer; font-size: 18px;">
+                ✖
+            </button>
+                    <div class="post-avatar">
+                        {% if post.user.avatar %}
+                            <img src="{{ post.user.avatar.url }}" alt="{{ post.user.full_name }}">
+                        {% else %}
+                            {{ post.user.full_name|slice:":1" }}
+                        {% endif %}
+                    </div>
+                    <div class="post-meta">
+                        <div class="post-author">{{ post.user.full_name }}</div>
+                        <div class="post-time">{{ post.created_at|timesince }} ago</div>
+                    </div>
+                </div>
+                <div class="post-content">
+                    {{ post.content }}
+                </div>
+                {% if post.media %}
+                <div class="post-media">
+                    <img src="{{ post.media.url }}" alt="Ảnh bài viết">
+                </div>
+                {% endif %}
+                <div class="post-reactions">
+                    <button class="reaction-btn {% if post.id in user_liked_posts %}liked{% endif %}"
+                            onclick="likePost(this, {{ post.id }})">
+                        <span>❤️</span>
+                        <span class="count">{{ post.likeCount }}</span>
+                    </button>
+                    <button class="reaction-btn" onclick="openModal({{ post.id }})">
+                        <span>💬</span>
+                        <span class="count">{{ post.commentCount }}</span>
+                    </button>
+                </div>
+
+            </div>
+            {% empty %}
+            <p>Chưa có bài viết nào.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
+
+
+<div id="friendsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Danh sách bạn bè</h2>
+            <span class="close" onclick="closeFriendsModal()">&times;</span>
+        </div>
+        <div class="friends-list" id="friendsList">
+            {% for friend in friends %}
+            <a href="{% url 'personal_with_id' friend.id %}" class="friend-item" style="text-decoration:none">
+                <div class="post-avatar">
+                    {% if friend.avatar %}
+                    <img src="{{ friend.avatar }}" alt="{{ friend.name }}">
+                    {% else %}
+                    {{ friend.name|slice:":1" }}
+                    {% endif %}
+                </div>
+                <div class="friend-info">
+                    <div class="friend-name">{{ friend.name }}</div>
+                </div>
+            </a>
+            {% empty %}
+            <p>Không có bạn bè nào</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal chỉnh sửa profile -->
+<div id="editProfileModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Chỉnh sửa thông tin cá nhân</h2>
+            <span class="close" onclick="closeEditProfileModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="editProfileForm" method="post" enctype="multipart/form-data" action="{% url 'edit_profile' %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditProfileModal()">Hủy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<style>
+    /* Chặn scroll body khi modal mở */
+    body.no-scroll {
+        overflow: hidden;
+    }
+    .delete-comment-btn {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 34px;
+        cursor: pointer;
+        margin-left: auto; /* đẩy nút sang bên phải */
+        transition: color 0.2s;
+    }
+
+    .delete-comment-btn:hover {
+        color: red;
+    }
+
+    /* Overlay phủ toàn màn hình */
+    .modal2-overlay {
+    display: none;
+    position: fixed;
+    inset: 0; /* top:0; right:0; bottom:0; left:0; */
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    }
+
+    /* Hiển thị overlay khi active */
+    .modal2-overlay.active {
+    display: flex;
+    }
+
+    /* Modal chính */
+    .modal2 {
+    background: white;
+    border-radius: 20px;
+    width: 60%;
+    max-width: 800px;
+    max-height: 90vh; /* chiếm 90% chiều cao màn hình */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* header và form cố định */
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    transform: scale(0.7);
+    transition: transform 0.3s ease;
+    position: relative;
+    }
+
+    /* Khi active modal */
+    .modal2-overlay.active .modal2 {
+    transform: scale(1);
+    }
+
+    /* Modal header */
+    .modal2-header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    }
+
+    /* Modal body scrollable */
+    .modal2-body {
+    flex: 1; /* chiếm hết phần còn lại */
+    overflow-y: auto; /* scroll bên trong */
+    padding: 0;
+    }
+
+    /* Form comment */
+    .comment-form {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+    flex-shrink: 0;
+    }
+
+    .modal2-title {
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .close-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        transition: all 0.2s ease;
+    }
+
+    .close-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(90deg);
+    }
+
+    .user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+
+        overflow:hidden;
+    }
+
+    .user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Ảnh bao phủ vừa vặn, không méo */
+        display: block; /* loại bỏ khoảng trắng dưới ảnh */
+    }
+
+    .comment-input-wrapper {
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+        padding:20px;
+    }
+
+    .comment-input-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .comment-input {
+        width: 100%;
+        min-height: 100px;
+        padding: 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 15px;
+        resize: vertical;
+        font-family: inherit;
+        font-size: 14px;
+        transition: border-color 0.3s ease;
+        background: white;
+    }
+
+    .comment-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .attachment-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .attachment-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .file-input {
+        display: none;
+    }
+
+    .attach-btn {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        color: #667eea;
+        padding: 8px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .attach-btn:hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .submit-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .preview-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .image-preview {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 2px solid #e9ecef;
+    }
+
+    .image-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .remove-image {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ff4757;
+        color: white;
+        border: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .remove-image:hover {
+        background: #ff3742;
+        transform: scale(1.1);
+    }
+
+    .comments-list {
+        padding: 0;
+    }
+
+    .comment-item {
+        padding: 20px 25px;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.2s ease;
+    }
+
+    .comment-item:hover {
+        background: #f8f9fa;
+    }
+
+    .comment-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .comment-author {
+        font-size:17px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .comment-time {
+        color: #888;
+        font-size: 15px;
+    }
+
+    .comment-content {
+        color: #555;
+        line-height: 1.6;
+        margin-bottom: 10px;
+        font-size:20px;
+    }
+
+    .comment-images {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .comment-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+
+    .comment-image:hover {
+        transform: scale(1.05);
+    }
+
+    .comment-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .comment-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 15px;
+    }
+
+    .action-btn {
+        background: none;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        border-radius: 15px;
+        transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+        background: #f0f0f0;
+        color: #667eea;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 25px;
+        color: #888;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+
+    /* Image viewer modal */
+    .image-viewer-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .image-viewer-overlay.active {
+        display: flex;
+    }
+
+    .image-viewer {
+        max-width: 90%;
+        max-height: 90%;
+    }
+
+    .image-viewer img {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 10px;
+    }
+
+    /* Custom scrollbar */
+    .modal2-body::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .modal2-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .modal2-body::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+
+    .modal2-body::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    @media (max-width: 640px) {
+        .modal2 {
+            width: 95%;
+            max-height: 90vh;
+        }
+
+        .comment-form {
+            padding: 20px;
+        }
+
+        .comment-item {
+            padding: 15px 20px;
+        }
+
+        .comment-input-wrapper {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .image-preview {
+            width: 60px;
+            height: 60px;
+        }
+    }
+</style>
+
+
+<!-- Modal (đặt 1 modal dùng chung cho tất cả post) -->
+<div class="modal2-overlay" id="modal2Overlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal2" onclick="event.stopPropagation()">
+      <div class="modal2-header">
+        <div class="modal2-title">💬 Bình luận</div>
+        <button class="close-btn" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal2-body">
+        <form id="commentForm" method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="comment-input-wrapper">
+            <div class="user-avatar">
+              {% if current_user.avatar %}
+                <img src="{{ current_user.avatar.url }}" alt="{{ current_user.full_name }}" />
+              {% else %} {{ current_user.full_name|slice:":1" }} {% endif %}
+            </div>
+            <div class="comment-input-container">
+              <textarea class="comment-input" placeholder="Viết bình luận của bạn..." name="content" id="commentInput"></textarea>
+              <div class="attachment-section">
+                <div class="attachment-controls">
+                  <input type="file" name="image" id="fileInput" class="file-input" accept="image/*">
+                  <label for="fileInput" class="attach-btn">📎 Đính kèm ảnh</label>
+                  <button type="submit" class="submit-btn">Đăng bình luận</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <div class="comments-list" id="commentsList">
+          <!-- HTML comment sẽ được load vào đây -->
+        </div>
+      </div>
+    </div>
+</div>
+
+
+<script>
+    function openModal(postId) {
+        fetch(`/get-comments/${postId}/`)
+          .then(res => res.text())
+          .then(html => {
+            document.getElementById("commentsList").innerHTML = html;
+
+            // gán action form
+            const form = document.getElementById("commentForm");
+            form.dataset.postId = postId;
+            form.action = `/add-comment/${postId}/`;
+
+            const overlay = document.getElementById("modal2Overlay");
+            overlay.classList.add("active");
+
+            // chặn scroll body
+            document.body.classList.add("no-scroll");
+          });
+    }
+    function closeModal() {
+        const overlay = document.getElementById("modal2Overlay");
+        overlay.classList.remove("active");
+
+        // cho phép scroll lại
+        document.body.classList.remove("no-scroll");
+    }
+    function closeModalOnOverlay(event) {
+        if (event.target === event.currentTarget) {
+            closeModal();
+        }
+    }
+    // Bắt sự kiện ESC
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
+            closeModal();
+        }
+    });
+    // Submit comment
+    document.getElementById("commentForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const postId = form.dataset.postId;
+        const formData = new FormData(form);
+
+        const content = formData.get("content").trim();
+        const image = formData.get("image");
+        if (!content && (!image || image.size === 0)) {
+            alert("Vui lòng nhập nội dung hoặc chọn ảnh!");
+            return;
+        }
+
+        fetch(`/add-comment/${postId}/`, {
+            method: "POST",
+            body: formData,
+            headers: { "X-CSRFToken": formData.get("csrfmiddlewaretoken") }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                const commentsList = document.getElementById("commentsList");
+
+                // Xóa dòng "Chưa có bình luận nào" nếu có
+                const noComment = commentsList.querySelector(".no-comment");
+                if (noComment) {
+                    noComment.remove();
+                }
+
+                // Thêm comment mới
+                commentsList.insertAdjacentHTML("afterbegin", data.html);
+                form.reset();
+            }
+        });
+    });
+
+    function deleteComment(commentId, postId) {
+        if (!confirm("Bạn có chắc chắn muốn xóa bình luận này không?")) {
+            return; // hủy xóa
+        }
+        fetch(`/delete_comment/${commentId}/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken")
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Xoá comment khỏi DOM
+                let cmtElem = document.querySelector(`#comment-${data.comment_id}`);
+                if (cmtElem) cmtElem.remove();
+
+                // Update commentCount
+                let countElem = document.querySelector(`#comment-count-${data.post_id}`);
+                if (countElem) {
+                    countElem.textContent = data.commentCount;
+                }
+            }
+        });
+    }
+
+    function likeComment(commentId, button) {
+        fetch(`/like-comment/${commentId}/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken")
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'liked' || data.status === 'unliked') {
+                // Cập nhật số lượng like
+                const likeCountSpan = button.querySelector('.like-count');
+                if (likeCountSpan) {
+                    likeCountSpan.textContent = data.likeCount;
+                }
+
+                // Đổi trạng thái nút
+                if (data.status === 'liked') {
+                    button.dataset.liked = 'true';
+                    button.style.color = '#3b82f6';
+                } else {
+                    button.dataset.liked = 'false';
+                    button.style.color = '';
+                }
+            }
+        })
+        .catch(err => console.error('Error liking comment:', err));
+    }
+
+    function toggleReplyForm(commentId) {
+        const replyForm = document.getElementById(`reply-form-${commentId}`);
+        if (replyForm) {
+            replyForm.style.display = replyForm.style.display === 'none' ? 'block' : 'none';
+
+            // Focus vào input khi mở form
+            if (replyForm.style.display === 'block') {
+                const input = document.getElementById(`reply-input-${commentId}`);
+                if (input) input.focus();
+            }
+        }
+    }
+
+    function submitReply(commentId, postId) {
+        const input = document.getElementById(`reply-input-${commentId}`);
+        const content = input.value.trim();
+
+        if (!content) {
+            alert('Vui lòng nhập nội dung trả lời');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('content', content);
+
+        fetch(`/reply-comment/${commentId}/`, {
+            method: 'POST',
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Tìm replies section
+                const repliesSection = document.getElementById(`replies-section-${commentId}`);
+
+                // Nếu section đang ẩn, hiện nó lên
+                if (repliesSection && repliesSection.style.display === 'none') {
+                    repliesSection.style.display = 'block';
+                }
+
+                // Thêm reply vào danh sách replies
+                const repliesContainer = document.getElementById(`replies-${commentId}`);
+                if (repliesContainer) {
+                    repliesContainer.insertAdjacentHTML('beforeend', data.html);
+                }
+
+                // Cập nhật commentCount
+                const countElem = document.querySelector(`#comment-count-${postId}`);
+                if (countElem) {
+                    countElem.textContent = data.commentCount;
+                }
+
+                // Đóng form và clear input
+                input.value = '';
+                toggleReplyForm(commentId);
+            }
+        })
+        .catch(err => console.error('Error submitting reply:', err));
+    }
+</script>
+
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'personal/script.js' %}" defer></script>
+{% endblock %}
+

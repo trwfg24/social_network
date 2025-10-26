@@ -1,0 +1,33 @@
+<div class="reply-item bg-white rounded-lg border border-gray-200 p-4 shadow-sm" id="comment-{{ c.id }}">
+    <!-- Header -->
+    <div class="comment-header flex items-center gap-3 mb-2">
+        <div class="user-avatar w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+            {% if c.user.avatar %}
+                <img src="{{ c.user.avatar.url }}" class="w-10 h-10 rounded-full object-cover" />
+            {% else %}
+                <span class="font-bold">{{ c.user.full_name|first|upper }}</span>
+            {% endif %}
+        </div>
+        <div class="flex-1">
+            <div class="comment-author font-semibold text-gray-800">{{ c.user.full_name }}</div>
+            <div class="comment-time text-xs text-gray-500">{{ c.created_at|timesince }} trước</div>
+        </div>
+        {% if current_user == c.user or current_user == c.post.user %}
+            <button class="delete-comment-btn text-red-500 hover:text-red-700 font-bold text-xl" onclick="deleteComment({{c.id}}, {{c.post.id}})">×</button>
+        {% endif %}
+    </div>
+
+    <!-- Nội dung -->
+    <div class="comment-content mb-3 text-gray-700 ml-13">
+        {{ c.content }}
+    </div>
+
+    <!-- Ảnh -->
+    {% if c.image %}
+    <div class="comment-images mb-3 ml-13">
+        <div class="comment-image w-32 h-32 overflow-hidden rounded-lg cursor-pointer border border-gray-200">
+            <img src="{{ c.image.url }}" alt="Ảnh bình luận" class="w-full h-full object-cover hover:scale-110 transition-transform" />
+        </div>
+    </div>
+    {% endif %}
+</div>

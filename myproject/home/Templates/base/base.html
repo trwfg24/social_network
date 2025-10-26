@@ -1,0 +1,282 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Younity - Kết nối mọi lúc</title>
+    <link rel="stylesheet" href="{% static 'base/style.css' %}">
+    <script src="{% static 'base/script.js' %}" defer></script>
+
+    {% block extra_css %}
+    <!-- CSS riêng của từng trang sẽ chèn vào đây -->
+    {% endblock %}
+</head>
+<body>
+
+    <!-- Navbar chung -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <a href="{% url 'home' %}" class="logo">Younity</a>
+            <div class="search-box">
+                <form action="{% url 'findfriend' %}" method="get">
+                  <input
+                    type="text"
+                    id="searchInput"
+                    name="q"
+                    class="search-input"
+                    placeholder="Tìm kiếm bạn bè..."
+                  >
+                </form>
+              </div>
+
+            <div class="nav-icons">
+                <a href="{% url 'home' %}" class="nav-icon" title="Trang chủ" style="text-decoration:none">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                    </svg>
+                </a>
+                <div class="nav-icon" title="Tin nhắn">
+                    <a href="{% url 'chat' %}" style="text-decoration:none; color: inherit; position: relative; display: block;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                        </svg>
+                        <span id="message-count" class="notification-badge">{{ unread_messages_count }}</span>
+                    </a>
+                </div>
+
+                <div class="nav-icon has-dropdown" title="Thông báo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                    <span id="notification-count" class="notification-badge">{{ unread_count }}</span>
+                    <div id="notification-list" class="dropdown">
+                        {% for notification in notifications %}
+                            <div class="dropdown-item {% if not notification.is_read %}unread{% endif %}" data-id="{{ notification.id }}">
+                                {% if notification.post %}
+                                {% if notification.comment %}
+                                    <a href="{% url 'personal' %}?highlight={{ notification.post.id }}&comment={{ notification.comment.id }}">
+                                        {% if notification.sender.avatar %}
+                                            <img src="{{ notification.sender.avatar.url }}" alt="avatar"
+                                                 width="24" height="24"
+                                                 style="border-radius:50%;vertical-align:middle;margin-right:5px;">
+                                        {% else %}
+                                            <span style="display:inline-block;width:24px;height:24px;
+                                                         border-radius:50%;background:linear-gradient(45deg, #4ecdc4, #44a08d);color:#fff;
+                                                         text-align:center;line-height:24px;
+                                                         font-weight:bold;margin-right:5px;">
+                                                {{ notification.sender.full_name|first|upper }}
+                                            </span>
+                                        {% endif %}
+                                        {{ notification.message }}
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'personal' %}?highlight={{ notification.post.id }}">
+                                        {% if notification.sender.avatar %}
+                                            <img src="{{ notification.sender.avatar.url }}" alt="avatar"
+                                                 width="24" height="24"
+                                                 style="border-radius:50%;vertical-align:middle;margin-right:5px;">
+                                        {% else %}
+                                            <span style="display:inline-block;width:24px;height:24px;
+                                                         border-radius:50%;background:linear-gradient(45deg, #4ecdc4, #44a08d);color:#fff;
+                                                         text-align:center;line-height:24px;
+                                                         font-weight:bold;margin-right:5px;">
+                                                {{ notification.sender.full_name|first|upper }}
+                                            </span>
+                                        {% endif %}
+                                        {{ notification.message }}
+                                    </a>
+                                {% endif %}
+                            {% else %}
+                                <a href="{% url 'personal_with_id' notification.sender.id %}" style="text-decoration:none;">
+                                    {% if notification.sender.avatar %}
+                                        <img src="{{ notification.sender.avatar.url }}" alt="avatar"
+                                             width="24" height="24"
+                                             style="border-radius:50%;vertical-align:middle;margin-right:5px;">
+                                    {% else %}
+                                        <span style="display:inline-block;width:24px;height:24px;
+                                                     border-radius:50%;background:linear-gradient(45deg, #4ecdc4, #44a08d);color:#fff;
+                                                     text-align:center;line-height:24px;
+                                                     font-weight:bold;margin-right:5px;">
+                                            {{ notification.sender.full_name|first|upper }}
+                                        </span>
+                                    {% endif %}
+                                    {{ notification.message }}
+                                </a>
+                            {% endif %}
+
+                                {% comment %} <p style="font-size:0.8rem;position:relative;left:125px;">{{notification.created_at|timesince}} ago</p> {% endcomment %}
+                            </div>
+                        {% empty %}
+                            <div class="dropdown-item" style="padding:0.5rem 0.8rem">Không có thông báo nào</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+<script>
+        // Tạo kết nối websocket
+        const socket = new WebSocket(
+            `ws://${window.location.host}/ws/notifications/`
+        );
+
+    socket.onmessage = function(e) {
+    const data = JSON.parse(e.data);
+    console.log(data)
+
+    // Xử lý tin nhắn mới
+    if (data.type === 'new_message') {
+        const messageCountSpan = document.getElementById('message-count');
+        if (messageCountSpan) {
+            messageCountSpan.innerText = data.unread_count;
+            messageCountSpan.style.display = data.unread_count > 0 ? 'flex' : 'none';
+        }
+        return;
+    }
+
+    const notificationCount = document.getElementById('notification-count');
+    notificationCount.innerText = data.count;
+    notificationCount.style.display = data.count > 0 ? 'flex' : 'none';
+
+    const list = document.getElementById('notification-list');
+
+    let avatarHtml = "";
+    if (data.sender_img_url) {
+        avatarHtml = `<img src="${data.sender_img_url}"
+                           alt="avatar"
+                           width="24" height="24"
+                           style="border-radius:50%;vertical-align:middle;margin-right:5px;">`;
+    } else {
+        // Nếu không có avatar thì lấy chữ cái đầu (uppercase)
+        const initial = data.sender_name ? data.message.trim().charAt(0).toUpperCase() : "?";
+        avatarHtml = `<span style="display:inline-block;width:24px;height:24px;
+                                  border-radius:50%;background:linear-gradient(45deg, #4ecdc4, #44a08d);color:#fff;
+                                  text-align:center;line-height:24px;
+                                  font-weight:bold;margin-right:5px;">
+                          ${initial}
+                      </span>`;
+    }
+
+    let html = "";
+    if (data.post_id) {
+        if (data.comment_id) {
+            // Có cả post & comment
+            html = `
+                <div class="dropdown-item unread" data-id="${data.id}">
+                    <a href="/personal?highlight=${data.post_id}&comment=${data.comment_id}">
+                        ${avatarHtml} ${data.message}
+                    </a>
+                </div>`;
+        } else {
+            // Chỉ có post
+            html = `
+                <div class="dropdown-item unread" data-id="${data.id}">
+                    <a href="/personal?highlight=${data.post_id}">
+                        ${avatarHtml} ${data.message}
+                    </a>
+                </div>`;
+        }
+    } else {
+        // Thông báo chỉ là text
+        html = `
+            <div class="dropdown-item unread" data-id="${data.id}">
+                <a href="/personal_with_id/${data.sender_id}" style="text-decoration:none;">
+                    ${avatarHtml} ${data.message}
+                </a>
+            </div>`;
+    }
+
+
+    list.insertAdjacentHTML("afterbegin", html);
+
+    // Gắn sự kiện click cho <a> mới
+    const newLink = list.querySelector(".dropdown-item:first-child a");
+    if (newLink) {
+        newLink.addEventListener("click", function(e){
+            e.preventDefault();
+            const notificationDiv = this.closest('.dropdown-item');
+            const notificationId = notificationDiv.dataset.id;
+            const href = this.href;
+
+            // Đánh dấu đã đọc và cập nhật UI ngay lập tức
+            if (notificationDiv.classList.contains('unread')) {
+                fetch("{% url 'mark_notification_read' %}?id=" + notificationId)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'ok') {
+                        notificationDiv.classList.remove('unread');
+                        let countSpan = document.getElementById('notification-count');
+                        let count = parseInt(countSpan.innerText);
+                        count = Math.max(0, count - 1);
+                        countSpan.innerText = count;
+                        countSpan.style.display = count > 0 ? 'flex' : 'none';
+                    }
+                });
+            }
+
+            // Điều hướng sau khi đánh dấu đã đọc
+            setTimeout(() => {
+                window.location.href = href;
+            }, 100);
+        });
+    }
+};
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#notification-list a').forEach(link => {
+            link.addEventListener('click', function(e){
+                e.preventDefault();
+                const notificationDiv = this.closest('.dropdown-item');
+                const notificationId = notificationDiv.dataset.id;
+                const href = this.href;
+
+                // Đánh dấu đã đọc và cập nhật UI ngay lập tức
+                if (notificationDiv.classList.contains('unread')) {
+                    fetch("{% url 'mark_notification_read' %}?id=" + notificationId)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'ok') {
+                            notificationDiv.classList.remove('unread');
+                            let countSpan = document.getElementById('notification-count');
+                            let count = parseInt(countSpan.innerText);
+                            count = Math.max(0, count - 1);
+                            countSpan.innerText = count;
+                            countSpan.style.display = count > 0 ? 'flex' : 'none';
+                        }
+                    });
+                }
+
+                // Điều hướng sau khi đánh dấu đã đọc
+                setTimeout(() => {
+                    window.location.href = href;
+                }, 100);
+            });
+        });
+    });
+</script>
+
+                <div class="nav-icon has-dropdown" title="Tài khoản">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <div class="dropdown">
+                        <a href="{% url 'personal' %}">Trang cá nhân</a>
+                        <a href="{% url 'logout' %}" style="color:#ef4444">Đăng xuất</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Nội dung từng trang -->
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+
+    {% block extra_js %}
+    <!-- JS riêng của từng trang sẽ chèn vào đây -->
+    {% endblock %}
+</body>
+</html>
